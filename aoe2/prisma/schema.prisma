@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Match {
+  id             String    @id
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  server         String?
+  durationInGame Int?
+  durationReal   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  map     Map                @relation(fields: [mapId], references: [id])
+  players PlayersOnMatches[]
+  mapId   Int
+}
+
+model PlayersOnMatches {
+  id       String  @id @default(cuid())
+  colorId Int
+  team     Int
+  winner   Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  civilizationId Int
+  civilization   Civilization @relation(fields: [civilizationId], references: [id])
+  playerId       String
+  player         Player       @relation(fields: [playerId], references: [id])
+  matchId        String
+  match          Match        @relation(fields: [matchId], references: [id])
+}
+
+model Civilization {
+  id               Int                @id
+  name             String
+  PlayersOnMatches PlayersOnMatches[]
+}
+
+model Map {
+  id    Int     @id
+  name  String
+  Match Match[]
+}
+
+model Player {
+  id               String             @id
+  name             String
+  country          String?
+  PlayersOnMatches PlayersOnMatches[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+}
