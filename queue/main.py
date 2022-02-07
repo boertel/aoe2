@@ -141,7 +141,7 @@ class RecordingNotFoundError(Exception):
     pass
 
 
-def schedule(profile_id, count=1, start=0):
+def match_for_player(profile_id, count=1, start=0):
     # 1. fetch last N matches for profile_id
     response = requests.get(
         f"https://aoe2.net/api/player/matches?game=aoe2de&profile_id={profile_id}&count={count}&start={start}"
@@ -233,8 +233,15 @@ def from_files(directory):
     return output
 
 
-if sys.argv[1] == "api":
-    output = schedule(sys.argv[2])
-elif sys.argv[1] == "file":
-    output = from_files(sys.argv[2])
+def from_publisher(event, context):
+    print(event)
+    print(context)
+
+
+if __name__ == "__main__":
+    output = {}
+    if sys.argv[1] == "api":
+        output = match_for_player(sys.argv[2])
+    elif sys.argv[1] == "file":
+        output = from_files(sys.argv[2])
     print(json.dumps(output, default=json_serializer))
