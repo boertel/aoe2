@@ -11,26 +11,29 @@ datasource db {
 }
 
 model Match {
-  id             String    @id
-  startedAt      DateTime?
-  finishedAt     DateTime?
-  server         String?
-  durationInGame Int?
-  durationReal   Int?
+  id              String    @id
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  server          String?
+  durationInGame  Int?
+  durationReal    Int?
+  ratingType      Int?
+  leaderboardType Int?
+  gameType        Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  map     Map                @relation(fields: [mapId], references: [id])
+  mapId   Int?
+  map     Map?               @relation(fields: [mapId], references: [id])
   players PlayersOnMatches[]
-  mapId   Int
 }
 
 model PlayersOnMatches {
-  id       String  @id @default(cuid())
+  id      String   @id @default(cuid())
   colorId Int
-  team     Int
-  winner   Boolean
+  team    Int
+  winner  Boolean?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -57,7 +60,7 @@ model Map {
 
 model Player {
   id               String             @id
-  name             String
+  name             String?
   country          String?
   PlayersOnMatches PlayersOnMatches[]
 
