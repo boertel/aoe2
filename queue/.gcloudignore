@@ -1,5 +1,3 @@
-/*
-
-!requirements.txt
-!main.py
-
+poetry.lock
+README.md
+pyproject.toml

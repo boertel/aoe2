@@ -1,4 +1,5 @@
 from mgz.summary import Summary
+from functools import wraps
 import json
 import sys
 from datetime import datetime, timedelta
@@ -141,6 +142,7 @@ class RecordingNotFoundError(Exception):
     pass
 
 
+@task
 def match_for_player(profile_id, count=1, start=0):
     # 1. fetch last N matches for profile_id
     response = requests.get(
@@ -155,6 +157,7 @@ def match_for_player(profile_id, count=1, start=0):
             download(match["match_id"])
 
 
+@task
 def download(match_id):
     storage = GoogleCloudStorage()
     if not storage.exists(match_id):
@@ -178,6 +181,7 @@ def download(match_id):
     parse(match_id)
 
 
+@task
 def parse(match_id):
     sys.stdout.write(f"parse match_id={match_id}\n")
     # 1. fetch https://aoe2.net/api/match?match_id=match_id
@@ -232,6 +236,13 @@ def from_files(directory):
                 sys.stderr.write(f"failed to parse {file} {exception}")
     return output
 
+
+def task(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        func(*args, **kwargs)
+    print(func.__name__)
+    return wrapper
 
 def from_publisher(event):
     attributes = event.get("attributes", {})
