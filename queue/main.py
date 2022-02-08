@@ -233,9 +233,11 @@ def from_files(directory):
     return output
 
 
-def from_publisher(event, context):
-    print(event)
-    print(context)
+def from_publisher(event):
+    attributes = event.get("attributes", {})
+    profile_id = attributes.get("profile_id")
+    if profile_id:
+        match_for_player(profile_id)
 
 
 if __name__ == "__main__":
