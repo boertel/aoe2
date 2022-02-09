@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 import zipfile
 import requests
-from google.cloud import storage
+from google.cloud import storage, pubsub_v1
 import os
 
 
@@ -142,7 +142,40 @@ class RecordingNotFoundError(Exception):
     pass
 
 
-@task
+project_id = os.environ["GOOGLE_PUBSUB_PROJECT_ID"]
+topic_id = "aoe2-recording"
+publisher = pubsub_v1.PublisherClient()
+
+
+def create_call(topic_id):
+    def _call(*args, **kwargs):
+        attributes = kwargs
+        topic_path = publisher.topic_path(project_id, topic_id)
+        print(topic_path, attributes)
+        # publisher.publish(topic_path, **attributes)
+
+    return _call
+
+
+def task():
+    def decorator(func):
+        func.call = create_call(func.__name__)
+
+        @wraps(func)
+        def wrapper(event, context):
+            kwargs = {"event": event, "context": context}
+            if hasattr(event, "attributes"):
+                kwargs.update(event["attributes"])
+            func(**kwargs)
+
+        # register cloud function
+        print(func.__name__)
+        return wrapper
+
+    return decorator
+
+
+@task()
 def match_for_player(profile_id, count=1, start=0):
     # 1. fetch last N matches for profile_id
     response = requests.get(
@@ -157,7 +190,7 @@ def match_for_player(profile_id, count=1, start=0):
             download(match["match_id"])
 
 
-@task
+@task()
 def download(match_id):
     storage = GoogleCloudStorage()
     if not storage.exists(match_id):
@@ -181,7 +214,7 @@ def download(match_id):
     parse(match_id)
 
 
-@task
+@task()
 def parse(match_id):
     sys.stdout.write(f"parse match_id={match_id}\n")
     # 1. fetch https://aoe2.net/api/match?match_id=match_id
@@ -237,24 +270,13 @@ def from_files(directory):
     return output
 
 
-def task(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        func(*args, **kwargs)
-    print(func.__name__)
-    return wrapper
-
-def from_publisher(event):
-    attributes = event.get("attributes", {})
-    profile_id = attributes.get("profile_id")
-    if profile_id:
-        match_for_player(profile_id)
-
-
 if __name__ == "__main__":
+    """
     output = {}
     if sys.argv[1] == "api":
         output = match_for_player(sys.argv[2])
     elif sys.argv[1] == "file":
         output = from_files(sys.argv[2])
     print(json.dumps(output, default=json_serializer))
+    """
+    match_for_player.call(profile_id=sys.argv[1])

@@ -9,6 +9,7 @@ python = "^3.9"
 mgz = { git = "https://github.com/happyleavesaoc/aoc-mgz", branch = "master" }
 requests = "^2.27.1"
 google-cloud-storage = "^2.1.0"
+google-cloud-pubsub = "^2.9.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
