@@ -11,6 +11,7 @@ import os
 
 
 RUN_TASKS_LOCALLY = os.environ.get("RUN_TASKS_LOCALLY") == "true"
+print("RUN_TASKS_LOCALLY", RUN_TASKS_LOCALLY)
 
 # 2918752
 
@@ -168,7 +169,9 @@ def task():
             kwargs.update({"event": event, "context": context})
             if hasattr(event, "attributes"):
                 kwargs.update(event["attributes"])
-            print(f"\tcalling {func.__name__} with {kwargs}")
+            print(
+                f"\tcalling {func.__name__} with {kwargs} RUN_TASKS_LOCALLY={RUN_TASKS_LOCALLY}"
+            )
             if RUN_TASKS_LOCALLY:
                 func(**kwargs)
             else:
@@ -181,8 +184,14 @@ def task():
     return decorator
 
 
-@task()
-def match_for_player(profile_id=None, count=1, start=0, **kwargs):
+def match_for_player(*args, **kwargs):
+    print(args)
+    print(kwargs)
+    print(f"match_for_player {kwargs} {args}")
+    attributes = kwargs.get("attributes", {})
+    start = 0
+    count = 1
+    profile_id = attributes["profile_id"]
     if profile_id is None:
         return
     # 1. fetch last N matches for profile_id
@@ -194,7 +203,6 @@ def match_for_player(profile_id=None, count=1, start=0, **kwargs):
         # 3. trigger /download function for un-process matches
         matches = response.json()
         for match in matches:
-            # TODO go throug pub/sub
             download(match_id=str(match["match_id"]))
 
 
@@ -288,4 +296,4 @@ if __name__ == "__main__":
         output = from_files(sys.argv[2])
     print(json.dumps(output, default=json_serializer))
     """
-    match_for_player.delay(profile_id=sys.argv[1])
+    match_for_player(profile_id=sys.argv[1])
