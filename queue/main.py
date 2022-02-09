@@ -154,7 +154,7 @@ def create_delay(topic_id):
         attributes = kwargs
         topic_path = publisher.topic_path(project_id, topic_id)
         print(topic_path, attributes)
-        publisher.publish(topic_path, **attributes)
+        publisher.publish(topic_path, b"", **attributes)
 
     return delay
 
@@ -195,7 +195,7 @@ def match_for_player(profile_id=None, count=1, start=0, **kwargs):
         matches = response.json()
         for match in matches:
             # TODO go throug pub/sub
-            download(match_id=match["match_id"])
+            download(match_id=str(match["match_id"]))
 
 
 @task()
@@ -220,7 +220,7 @@ def download(match_id=None, **kwargs):
                 # raise RecordingNotFoundError(f"recording not found for {match_id}")
                 pass
     # 5. pass along to /parse function
-    parse(match_id=match_id)
+    parse(match_id=str(match_id))
 
 
 @task()
