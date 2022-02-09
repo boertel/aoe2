@@ -10,6 +10,8 @@ from google.cloud import storage, pubsub_v1
 import os
 
 
+RUN_TASKS_LOCALLY = os.environ.get("RUN_TASKS_LOCALLY") == "true"
+
 # 2918752
 
 
@@ -147,36 +149,42 @@ topic_id = "aoe2-recording"
 publisher = pubsub_v1.PublisherClient()
 
 
-def create_call(topic_id):
-    def _call(*args, **kwargs):
+def create_delay(topic_id):
+    def delay(*args, **kwargs):
         attributes = kwargs
         topic_path = publisher.topic_path(project_id, topic_id)
         print(topic_path, attributes)
-        # publisher.publish(topic_path, **attributes)
+        publisher.publish(topic_path, **attributes)
 
-    return _call
+    return delay
 
 
 def task():
     def decorator(func):
-        func.call = create_call(func.__name__)
+        func.delay = create_delay(func.__name__)
 
         @wraps(func)
-        def wrapper(event, context):
-            kwargs = {"event": event, "context": context}
+        def wrapper(event={}, context=None, **kwargs):
+            kwargs.update({"event": event, "context": context})
             if hasattr(event, "attributes"):
                 kwargs.update(event["attributes"])
-            func(**kwargs)
+            print(f"\tcalling {func.__name__} with {kwargs}")
+            if RUN_TASKS_LOCALLY:
+                func(**kwargs)
+            else:
+                func.delay(**kwargs)
 
         # register cloud function
-        print(func.__name__)
+        print("register", func.__name__)
         return wrapper
 
     return decorator
 
 
 @task()
-def match_for_player(profile_id, count=1, start=0):
+def match_for_player(profile_id=None, count=1, start=0, **kwargs):
+    if profile_id is None:
+        return
     # 1. fetch last N matches for profile_id
     response = requests.get(
         f"https://aoe2.net/api/player/matches?game=aoe2de&profile_id={profile_id}&count={count}&start={start}"
@@ -187,14 +195,15 @@ def match_for_player(profile_id, count=1, start=0):
         matches = response.json()
         for match in matches:
             # TODO go throug pub/sub
-            download(match["match_id"])
+            download(match_id=match["match_id"])
 
 
 @task()
-def download(match_id):
+def download(match_id=None, **kwargs):
+    if match_id is None:
+        return
     storage = GoogleCloudStorage()
     if not storage.exists(match_id):
-        sys.stdout.write(f"download match_id={match_id}\n")
         # 1. fetch https://aoe2.net/api/match?match_id=match_id
         response = requests.get(
             f"https://aoe2.net/api/match?game=aoe2de&match_id={match_id}"
@@ -211,12 +220,11 @@ def download(match_id):
                 # raise RecordingNotFoundError(f"recording not found for {match_id}")
                 pass
     # 5. pass along to /parse function
-    parse(match_id)
+    parse(match_id=match_id)
 
 
 @task()
-def parse(match_id):
-    sys.stdout.write(f"parse match_id={match_id}\n")
+def parse(match_id=None, **kwargs):
     # 1. fetch https://aoe2.net/api/match?match_id=match_id
     response = get_match(match_id=match_id)
     if response.ok:
@@ -229,6 +237,7 @@ def parse(match_id):
             # 3. parse it with mgz
             item.update(extract_aoe2record(recording, item))
         # 4. save data to backend TODO
+        print(item)
         return item
         # requests.post(f"api/{match_id}", data=item)
 
@@ -279,4 +288,4 @@ if __name__ == "__main__":
         output = from_files(sys.argv[2])
     print(json.dumps(output, default=json_serializer))
     """
-    match_for_player.call(profile_id=sys.argv[1])
+    match_for_player.delay(profile_id=sys.argv[1])
