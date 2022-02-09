@@ -169,13 +169,7 @@ def task():
             kwargs.update({"event": event, "context": context})
             if hasattr(event, "attributes"):
                 kwargs.update(event["attributes"])
-            print(
-                f"\tcalling {func.__name__} with {kwargs} RUN_TASKS_LOCALLY={RUN_TASKS_LOCALLY}"
-            )
-            if RUN_TASKS_LOCALLY:
-                func(**kwargs)
-            else:
-                func.delay(**kwargs)
+            func(**kwargs)
 
         # register cloud function
         print("register", func.__name__)
@@ -184,14 +178,8 @@ def task():
     return decorator
 
 
-def match_for_player(*args, **kwargs):
-    print(args)
-    print(kwargs)
-    print(f"match_for_player {kwargs} {args}")
-    attributes = kwargs.get("attributes", {})
-    start = 0
-    count = 1
-    profile_id = attributes["profile_id"]
+@task()
+def match_for_player(profile_id=None, start=0, count=1):
     if profile_id is None:
         return
     # 1. fetch last N matches for profile_id
@@ -203,7 +191,7 @@ def match_for_player(*args, **kwargs):
         # 3. trigger /download function for un-process matches
         matches = response.json()
         for match in matches:
-            download(match_id=str(match["match_id"]))
+            download.delay(match_id=str(match["match_id"]))
 
 
 @task()
@@ -228,7 +216,7 @@ def download(match_id=None, **kwargs):
                 # raise RecordingNotFoundError(f"recording not found for {match_id}")
                 pass
     # 5. pass along to /parse function
-    parse(match_id=str(match_id))
+    parse.delay(match_id=str(match_id))
 
 
 @task()
