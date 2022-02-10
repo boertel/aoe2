@@ -152,7 +152,7 @@ def create_delay(topic_id):
         attributes = kwargs
         topic_path = publisher.topic_path(project_id, topic_id)
         print(topic_path, attributes)
-        future =  publisher.publish(topic_path, b"", **attributes)
+        future = publisher.publish(topic_path, b"", **attributes)
         print(future.result())
 
     return delay
@@ -239,7 +239,10 @@ def parse(match_id=None, **kwargs):
             item.update(extract_aoe2record(recording, item))
         # 4. save data to backend
         print(item)
-        requests.post(f"https://aoe2.fly.dev/api/match/{match_id}", data=item)
+        requests.post(
+            f"https://aoe2.fly.dev/api/match/{match_id}",
+            data=json.dumps(item, default=json_serializer),
+        )
         return item
 
 

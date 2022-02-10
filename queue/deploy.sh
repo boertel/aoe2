@@ -22,12 +22,14 @@ function deploy {
 upload
 
 if [[ -z "$1" ]]; then
-    deploy "match_for_player"
-    deploy "download"
-    deploy "parse"
+    deploy "match_for_player" &
+    deploy "download" &
+    deploy "parse" &
 else
     deploy "$1"
 fi
+
+wait
 
 # gcloud pubsub topics create
 # gcloud pubsub topics publish aoe2-recording  --attribute=profile_id=2918752
