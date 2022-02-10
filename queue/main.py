@@ -198,7 +198,7 @@ def download(match_id=None, **kwargs):
     if match_id is None:
         return
 
-    match = requests.get(f"https://aoe2.fly.dev/api/match/{match_id}")
+    match = requests.get(f"https://aoe2.fly.dev/api/match/{match_id}", timeout=10)
     if match.status_code == 200:
         # match has already been process, let's bail
         return
@@ -242,6 +242,7 @@ def parse(match_id=None, **kwargs):
         requests.post(
             f"https://aoe2.fly.dev/api/match/{match_id}",
             data=json.dumps(item, default=json_serializer),
+            timeout=10,
         )
         return item
 
@@ -293,9 +294,9 @@ if __name__ == "__main__":
     print(json.dumps(output, default=json_serializer))
     """
 
-    if sys.argv[1] == 'match_for_player':
+    if sys.argv[1] == "match_for_player":
         match_for_player.delay(profile_id=sys.argv[2])
-    elif sys.argv[1] == 'download':
+    elif sys.argv[1] == "download":
         download.delay(match_id=sys.argv[2])
-    elif sys.argv[1] == 'parse':
+    elif sys.argv[1] == "parse":
         parse.delay(match_id=sys.argv[2])
