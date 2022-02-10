@@ -10,9 +10,6 @@ from google.cloud import storage, pubsub_v1
 import os
 
 
-RUN_TASKS_LOCALLY = os.environ.get("RUN_TASKS_LOCALLY") == "true"
-print("RUN_TASKS_LOCALLY", RUN_TASKS_LOCALLY)
-
 # 2918752
 
 
@@ -155,7 +152,8 @@ def create_delay(topic_id):
         attributes = kwargs
         topic_path = publisher.topic_path(project_id, topic_id)
         print(topic_path, attributes)
-        publisher.publish(topic_path, b"", **attributes)
+        future =  publisher.publish(topic_path, b"", **attributes)
+        print(future.result())
 
     return delay
 
@@ -165,21 +163,21 @@ def task():
         func.delay = create_delay(func.__name__)
 
         @wraps(func)
-        def wrapper(event={}, context=None, **kwargs):
-            kwargs.update({"event": event, "context": context})
-            if hasattr(event, "attributes"):
+        def wrapper(event={}, context=None):
+            kwargs = {"event": event, "context": context}
+            if "attributes" in event:
                 kwargs.update(event["attributes"])
+            print(f"calling {func.__name__} with kwargs={kwargs}")
             func(**kwargs)
 
-        # register cloud function
-        print("register", func.__name__)
+        # TODO register cloud function
         return wrapper
 
     return decorator
 
 
 @task()
-def match_for_player(profile_id=None, start=0, count=1):
+def match_for_player(profile_id=None, start=0, count=1, **kwargs):
     if profile_id is None:
         return
     # 1. fetch last N matches for profile_id
@@ -196,6 +194,7 @@ def match_for_player(profile_id=None, start=0, count=1):
 
 @task()
 def download(match_id=None, **kwargs):
+    print(f"download match_id={match_id}")
     if match_id is None:
         return
     storage = GoogleCloudStorage()
@@ -221,6 +220,7 @@ def download(match_id=None, **kwargs):
 
 @task()
 def parse(match_id=None, **kwargs):
+    print(f"parse match_id={match_id}")
     # 1. fetch https://aoe2.net/api/match?match_id=match_id
     response = get_match(match_id=match_id)
     if response.ok:
@@ -284,4 +284,4 @@ if __name__ == "__main__":
         output = from_files(sys.argv[2])
     print(json.dumps(output, default=json_serializer))
     """
-    match_for_player(profile_id=sys.argv[1])
+    match_for_player.delay(profile_id=sys.argv[1])
