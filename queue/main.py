@@ -197,6 +197,11 @@ def download(match_id=None, **kwargs):
     print(f"download match_id={match_id}")
     if match_id is None:
         return
+
+    match = requests.get("https://aoe2.fly.dev/api/match/{match_id}")
+    if match.status_code == 200:
+        # match has already been process, let's bail
+        return
     storage = GoogleCloudStorage()
     if not storage.exists(match_id):
         # 1. fetch https://aoe2.net/api/match?match_id=match_id
@@ -232,10 +237,10 @@ def parse(match_id=None, **kwargs):
             recording = storage.read(match_id)
             # 3. parse it with mgz
             item.update(extract_aoe2record(recording, item))
-        # 4. save data to backend TODO
+        # 4. save data to backend
         print(item)
+        requests.post(f"https://aoe2.fly.dev/api/match/{match_id}", data=item)
         return item
-        # requests.post(f"api/{match_id}", data=item)
 
 
 def get_match(**kwargs):
