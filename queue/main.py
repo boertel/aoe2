@@ -198,7 +198,7 @@ def download(match_id=None, **kwargs):
     if match_id is None:
         return
 
-    match = requests.get("https://aoe2.fly.dev/api/match/{match_id}")
+    match = requests.get(f"https://aoe2.fly.dev/api/match/{match_id}")
     if match.status_code == 200:
         # match has already been process, let's bail
         return
