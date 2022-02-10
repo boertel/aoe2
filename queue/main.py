@@ -147,6 +147,10 @@ topic_id = "aoe2-recording"
 publisher = pubsub_v1.PublisherClient()
 
 
+API_DOMAIN = "https://aoe2.fly.dev"
+# API_DOMAIN = 'http://localhost:3000'
+
+
 def create_delay(topic_id):
     def delay(*args, **kwargs):
         attributes = kwargs
@@ -198,7 +202,7 @@ def download(match_id=None, **kwargs):
     if match_id is None:
         return
 
-    match = requests.get(f"https://aoe2.fly.dev/api/match/{match_id}", timeout=10)
+    match = requests.get(f"{API_DOMAIN}/api/match/{match_id}", timeout=10)
     if match.status_code == 200:
         # match has already been process, let's bail
         return
@@ -240,7 +244,7 @@ def parse(match_id=None, **kwargs):
         # 4. save data to backend
         print(item)
         requests.post(
-            f"https://aoe2.fly.dev/api/match/{match_id}",
+            f"{API_DOMAIN}/api/match/{match_id}",
             data=json.dumps(item, default=json_serializer),
             timeout=10,
         )
