@@ -1,10 +1,10 @@
 import { PrismaClient } from "@prisma/client";
 const db = new PrismaClient();
 
-import data from "./2918752.json";
+import data from "./seed.json";
 
-async function createMatches() {
-  const { matches, civilizations } = data;
+async function createCivilizations() {
+  const { civilizations } = data;
   if (civilizations) {
     await Promise.all(
       Object.keys(civilizations).map((civilizationId) => {
@@ -17,14 +17,6 @@ async function createMatches() {
       })
     );
   }
-  for (let index = 0; index < matches.length; index += 1) {
-    const match = matches[index];
-    try {
-      await createMatch(match);
-    } catch (exception) {
-      console.error(match.match_id, exception);
-    }
-  }
 }
 
-createMatches();
+createCivilizations();
