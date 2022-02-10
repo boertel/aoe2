@@ -181,7 +181,7 @@ def task():
 
 
 @task()
-def match_for_player(profile_id=None, start=0, count=1, **kwargs):
+def match_for_player(profile_id=None, start=0, count=20, **kwargs):
     if profile_id is None:
         return
     # 1. fetch last N matches for profile_id
@@ -189,7 +189,6 @@ def match_for_player(profile_id=None, start=0, count=1, **kwargs):
         f"https://aoe2.net/api/player/matches?game=aoe2de&profile_id={profile_id}&count={count}&start={start}"
     )
     if response.ok:
-        # 2. which games have been already process? TODO
         # 3. trigger /download function for un-process matches
         matches = response.json()
         for match in matches:
@@ -265,12 +264,6 @@ def get_strings(**kwargs):
 
 def from_files(directory):
     response = get_strings()
-    output = {
-        "matches": [],
-        "civilizations": {
-            civ["id"]: {"name": civ["string"]} for civ in response.json()["civ"]
-        },
-    }
     files = os.listdir(directory)
     for file in files:
         with open(os.path.join(directory, file), "rb") as recording:
@@ -279,28 +272,19 @@ def from_files(directory):
                 response = get_match(uuid=match["uuid"])
                 match.update(extract_api(response.json(), match))
                 requests.post(
-                    f"http://localhost:3000/api/{match['match_id']}",
+                    f"{API_DOMAIN}/api/match/{match['match_id']}",
                     data=json.dumps(match, default=json_serializer),
                 )
-                output["matches"].append(match)
             except Exception as exception:
                 sys.stderr.write(f"failed to parse {file} {exception}")
-    return output
 
 
 if __name__ == "__main__":
-    """
-    output = {}
-    if sys.argv[1] == "api":
-        output = match_for_player(sys.argv[2])
-    elif sys.argv[1] == "file":
-        output = from_files(sys.argv[2])
-    print(json.dumps(output, default=json_serializer))
-    """
-
     if sys.argv[1] == "match_for_player":
         match_for_player.delay(profile_id=sys.argv[2])
     elif sys.argv[1] == "download":
         download.delay(match_id=sys.argv[2])
     elif sys.argv[1] == "parse":
         parse.delay(match_id=sys.argv[2])
+    elif sys.argv[1] == "import":
+        from_files(sys.argv[2])
