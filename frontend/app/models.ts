@@ -1,5 +1,13 @@
 import { db } from "~/db.server";
 
+export async function getMatch(matchId) {
+  return await db.match.findUnique({
+    where: {
+      id: matchId,
+    },
+  });
+}
+
 export async function createMatch(match) {
   let map = null;
   if (match.map.id) {
