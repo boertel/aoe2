@@ -5,6 +5,14 @@ export async function getMatch(matchId) {
     where: {
       id: matchId,
     },
+    include: {
+      map: true,
+      players: {
+        include: {
+          civilization: true,
+        },
+      },
+    },
   });
 }
 
