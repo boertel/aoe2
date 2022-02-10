@@ -11,7 +11,7 @@ export async function loader({ params }) {
 
 export async function action({ request }) {
   const payload = await request.json();
-  console.log(payload);
+  console.log(JSON.stringify(payload));
   const match = await createMatch(payload);
   console.log(match);
   return new Response(match, {

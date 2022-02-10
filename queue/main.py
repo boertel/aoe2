@@ -292,4 +292,10 @@ if __name__ == "__main__":
         output = from_files(sys.argv[2])
     print(json.dumps(output, default=json_serializer))
     """
-    match_for_player.delay(profile_id=sys.argv[1])
+
+    if sys.argv[1] == 'match_for_player':
+        match_for_player.delay(profile_id=sys.argv[2])
+    elif sys.argv[1] == 'download':
+        download.delay(match_id=sys.argv[2])
+    elif sys.argv[1] == 'parse':
+        parse.delay(match_id=sys.argv[2])
