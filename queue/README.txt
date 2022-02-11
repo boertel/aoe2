@@ -19,3 +19,6 @@ what I want to know:
     - chart from pub/sub to cloud function
 
 ! service accounts need to be the same between pubsub / cloud function / storage
+
+
+function service account needs access to: cloud storage and pub/sub
