@@ -40,7 +40,7 @@ export default function Matches() {
     <ul className="max-w-prose mx-auto w-full space-y-4">
       {data.matches.map((match) => (
         <li key={match.id}>
-          {match.id} on {match.map.name} played at {match.startedAt} and lasted{" "}
+          {match.id} on {match.map?.name} played at {match.startedAt} and lasted{" "}
           <span
             title={`in game time: ${duration(match.durationInGame).format([
               "h HH",
@@ -58,7 +58,7 @@ export default function Matches() {
                 })}
                 key={id}
               >
-                {player.name} as {civilization.name}
+                {player?.name} as {civilization?.name}
               </li>
             ))}
           </ul>
