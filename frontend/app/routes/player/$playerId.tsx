@@ -4,6 +4,8 @@ import { useLoaderData } from "remix";
 import type { LoaderFunction } from "remix";
 import type { Match } from "@prisma/client";
 import { duration } from "@boertel/duration";
+import calendar from "dayjs/plugin/calendar";
+dayjs.extend(calendar);
 
 import { db } from "~/db.server";
 
@@ -72,16 +74,14 @@ export default function Matches() {
     wins += winRate.wins;
     losses += winRate.losses;
   });
+
+  let winRates = [...data.winRates];
   const winRate = parseInt((wins / (wins + losses)) * 100, 10);
-  const best = data.winRates.slice(0, 6);
-  const worse = data.winRates.slice(
-    data.winRates.length - 5,
-    data.winRates.length
-  );
-  const more = data.winRates.slice(5, data.winRates.length - 5);
+  const best = winRates.splice(0, 5);
+  const worse = winRates.splice(winRates.length - 5, 5);
   return (
     <>
-      <div className="max-w-prose mx-auto w-full space-y-4 mt-10">
+      <div className="max-w-prose mx-auto w-full space-y-4 mt-10 px-4">
         <h3
           className={cn("text-4xl", {
             "text-green-500": winRate >= 50,
@@ -90,73 +90,122 @@ export default function Matches() {
         >
           {winRate}%
         </h3>
-        <ul>
-          {best.map(({ civilization: { id, name }, wins, losses }) => (
-            <li key={id}>
-              {name}{" "}
-              <span className="text-green-800">
-                {parseInt((wins / (wins + losses)) * 100, 10)}%
-              </span>{" "}
-              win rate out of {wins + losses} matches.
-            </li>
-          ))}
-        </ul>
+        <div className="flex justify-between">
+          <WinRates winRates={best} className="text-green-600" />
+          <WinRates winRates={worse} className="text-red-600" />
+        </div>
         <details>
-          <summary>See more</summary>
-          <ul>
-            {more.map(({ civilization: { id, name }, wins, losses }) => (
-              <li key={id}>
-                {name}{" "}
-                <span className="text-blue-500">
-                  {parseInt((wins / (wins + losses)) * 100, 10)}%
-                </span>{" "}
-                out of {wins + losses} matches.
-              </li>
-            ))}
-          </ul>
+          <summary>See other civilizations</summary>
+          <WinRates winRates={winRates} />
         </details>
-        <ul>
-          {worse.map(({ civilization: { id, name }, wins, losses }) => (
-            <li key={id}>
-              {name}{" "}
-              <span className="text-red-500">
-                {parseInt((wins / (wins + losses)) * 100, 10)}%
-              </span>{" "}
-              out of {wins + losses} matches.
-            </li>
-          ))}
-        </ul>
       </div>
-      <ul className="max-w-prose mx-auto w-full space-y-4">
+      <ul className="max-w-prose mx-auto w-full space-y-4 p-4">
         {data.matches.map((match) => (
           <li key={match.id}>
-            {match.id} on {match.map?.name} played at {match.startedAt} and
-            lasted{" "}
-            <span
-              title={`in game time: ${duration(match.durationInGame).format([
-                "h HH",
-                "m MM",
-              ])}`}
-            >
-              {duration(match.durationReal).format(["h HH", "m MM"])}
-            </span>
-            <ul>
-              {match.players.map(({ id, player, winner, civilization }) => (
-                <li
-                  className={cn({
-                    "text-green-600": winner,
-                    "text-red-600": !winner,
-                  })}
-                  key={id}
-                >
-                  {player?.name} as {civilization?.name}{" "}
-                  <span className="text-sm font-mono">{player.id}</span>
-                </li>
-              ))}
-            </ul>
+            <Match key={match.id} {...match} />
           </li>
         ))}
       </ul>
     </>
+  );
+}
+
+function WinRates({ winRates, className }) {
+  return (
+    <ul>
+      {winRates.map(({ civilization: { id, name }, wins, losses }) => (
+        <li key={id}>
+          {name}{" "}
+          <span className={className}>
+            {parseInt((wins / (wins + losses)) * 100, 10)}%
+          </span>{" "}
+          out of {wins + losses} matches.
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Match({ players, durationReal, startedAt, map }) {
+  const playerId = "2918752";
+  let me = {};
+  let teams = {};
+  players.forEach((player) => {
+    teams[player.team] = teams[player.team] || [];
+    if (playerId === player.playerId) {
+      me = player;
+    }
+    teams[player.team].push(player);
+  });
+  return (
+    <div
+      className={cn(
+        "flex flex-col group border border-yellow-400 border-opacity-20 hover:border-opacity-100 transition-opacity rounded-md p-4 bg-opacity-10 space-y-2 cursor-pointer",
+        { "bg-green-600": me.winner, "bg-red-600": me.winner === false }
+      )}
+    >
+      <div className="flex justify-between">
+        {Object.values(teams).map((players, index) => {
+          return (
+            <ul
+              key={index}
+              className={cn(
+                "flex flex-col gap-2",
+                me.team === index + 1 && {
+                  "text-red-600": me.winner === false,
+                  "text-green-600": me.winner === true,
+                }
+              )}
+            >
+              {players.map(
+                ({ player, playerId, winner, colorId, civilization }) => (
+                  <li
+                    className={cn("flex items-center gap-1", {
+                      "flex-row-reverse": index === 1,
+                    })}
+                    key={playerId}
+                  >
+                    <img
+                      width="24px"
+                      height="24px"
+                      src={`https://aoecompanion.com/civ-icons/${civilization.name.toLowerCase()}.png`}
+                    />
+                    <Dot colorId={colorId} />
+                    {player.name}
+                  </li>
+                )
+              )}
+            </ul>
+          );
+        })}
+      </div>
+      <ul className="text-gray-500 text-sm font-light flex justify-between">
+        <li>{map.name}</li>
+        <li>
+          <span className="font-medium">{dayjs(startedAt).calendar()}</span> for{" "}
+          {duration(durationReal).format(["h HH", "m MM"])}
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+const COLORS = {
+  1: "#0000FF",
+  2: "#FB0006",
+  3: "#23FF07",
+  4: "#FFFF09",
+  5: "#22FFFF",
+  6: "#FB00FF",
+  7: "#2E2E2E",
+  8: "#FC6D07",
+};
+
+function Dot({ colorId }) {
+  return (
+    <div
+      className="w-2 h-2 opacity-10 group-hover:opacity-100 transition-opacity"
+      style={{ backgroundColor: COLORS[colorId + 1] }}
+    />
   );
 }
