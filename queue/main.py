@@ -147,7 +147,7 @@ topic_id = "aoe2-recording"
 publisher = pubsub_v1.PublisherClient()
 
 
-API_DOMAIN = "https://aoe2.fly.dev"
+API_DOMAIN = "https://aoe2.up.railway.app"
 # API_DOMAIN = 'http://localhost:3000'
 
 
