@@ -6,7 +6,6 @@ const credentials = JSON.parse(
   Buffer.from(process.env.GOOGLE_SA_KEY, "base64")
 );
 
-console.log(credentials);
 const pubsub = new PubSub({ projectId, credentials });
 
 export async function action({ params }) {
