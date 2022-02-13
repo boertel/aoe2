@@ -28,7 +28,7 @@ export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
   }
   const matches = await db.match.findMany({
     where,
-    orderBy: { id: "desc" },
+    orderBy: { startedAt: "desc" },
     include: {
       players: {
         orderBy: { team: "asc" },
