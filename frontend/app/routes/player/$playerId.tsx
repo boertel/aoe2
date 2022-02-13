@@ -149,8 +149,8 @@ function WinRates({ winRates, className }) {
           </div>
           <div className="flex gap-2">
             <img
-              width="24px"
-              height="24px"
+              style={{ width: "24px", height: "24px" }}
+              className="flex-shrink-0"
               src={`https://aoecompanion.com/civ-icons/${name.toLowerCase()}.png`}
             />
             {name}
