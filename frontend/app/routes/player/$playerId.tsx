@@ -164,7 +164,14 @@ function WinRates({ winRates, className }) {
   );
 }
 
-function Match({ players, durationReal, startedAt, map, leaderboardType }) {
+function Match({
+  players,
+  durationReal,
+  startedAt,
+  map,
+  leaderboardType,
+  ratingType,
+}) {
   const { playerId } = useParams();
   let me = {};
   let teams = {};
@@ -224,7 +231,7 @@ function Match({ players, durationReal, startedAt, map, leaderboardType }) {
       </div>
       <ul className="text-gray-500 text-sm font-light flex justify-between">
         <li>
-          {getLeaderboardLabel(leaderboardType)} on{" "}
+          {getRatingLabel(ratingType)} on{" "}
           <span className="font-medium">{map?.name || "Unknown"}</span>
         </li>
         <li>
@@ -247,6 +254,25 @@ function getLeaderboardLabel(leaderboardType) {
       13: "1v1 Empire Wars",
       14: "Team Empire Wars",
     }[leaderboardType] || ""
+  );
+}
+
+function getRatingLabel(ratingType) {
+  return (
+    {
+      0: "Unranked",
+      1: "1v1 Death Match",
+      2: "1v1 Random Map",
+      3: "Team Death Match",
+      4: "Team Random Map",
+      5: "1v1 Random Map Quick Play",
+      6: "Team Random Map Quick Play",
+      7: "1v1 Empire Wars Quick Play",
+      8: "Team Empire Wars Quick Play",
+      9: "Battle Royale Quick Play",
+      13: "1v1 Empire Wars",
+      14: "Team Empire Wars",
+    }[ratingType] || ""
   );
 }
 
