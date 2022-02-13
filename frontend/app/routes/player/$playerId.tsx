@@ -1,7 +1,7 @@
 import cn from "classnames";
 import dayjs from "dayjs";
-import { useLoaderData } from "remix";
-import type { LoaderFunction } from "remix";
+import { useLoaderData, Link } from "remix";
+import type { MetaFunction, LoaderFunction } from "remix";
 import type { Civilization, Match } from "@prisma/client";
 import { duration } from "@boertel/duration";
 import calendar from "dayjs/plugin/calendar";
@@ -11,6 +11,12 @@ dayjs.extend(calendar);
 import { db } from "~/db.server";
 
 type LoaderData = { matches: Array<Match>; civilizations: Array<Civilization> };
+
+export const meta: MetaFunction = () => {
+  return {
+    title: "AoE2",
+  };
+};
 
 export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
   const { playerId } = params;
@@ -165,6 +171,7 @@ function WinRates({ winRates, className }) {
 }
 
 function Match({
+  id,
   players,
   durationReal,
   startedAt,
@@ -183,7 +190,8 @@ function Match({
     teams[player.team].push(player);
   });
   return (
-    <div
+    <Link
+      to={`/match/${id}`}
       className={cn(
         "flex flex-col group border border-yellow-400 border-opacity-20 hover:border-opacity-100 transition-opacity rounded-md p-4 bg-opacity-10 space-y-2 cursor-pointer",
         durationReal > 5 * 60
@@ -238,7 +246,7 @@ function Match({
           {duration(durationReal).format(["h HH", "m MM"])}
         </li>
       </ul>
-    </div>
+    </Link>
   );
 }
 
