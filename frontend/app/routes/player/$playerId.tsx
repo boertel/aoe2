@@ -191,7 +191,7 @@ function Match({
           : "bg-gray-100 border-gray-400"
       )}
     >
-      <div className="flex justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {Object.values(teams).map((players, index) => {
           return (
             <ul
@@ -207,12 +207,9 @@ function Match({
               {players.map(
                 ({ player, playerId, winner, colorId, civilization }) => (
                   <li
-                    className={cn(
-                      "flex items-center gap-2 text-ellipsis overflow-hidden",
-                      {
-                        "flex-row-reverse": index === 1,
-                      }
-                    )}
+                    className={cn("flex items-center gap-2", {
+                      "flex-row sm:flex-row-reverse": index === 1,
+                    })}
                     key={playerId}
                   >
                     <img
@@ -221,7 +218,9 @@ function Match({
                       src={`https://aoecompanion.com/civ-icons/${civilization.name.toLowerCase()}.png`}
                     />
                     <Dot colorId={colorId} />
-                    {player?.name}
+                    <div className="text-ellipsis overflow-hidden">
+                      {player?.name}
+                    </div>
                   </li>
                 )
               )}
@@ -229,7 +228,7 @@ function Match({
           );
         })}
       </div>
-      <ul className="text-gray-500 text-sm font-light flex justify-between">
+      <ul className="text-gray-500 text-sm font-light flex justify-between flex-wrap gap-1">
         <li>
           {getRatingLabel(ratingType)} on{" "}
           <span className="font-medium">{map?.name || "Unknown"}</span>
