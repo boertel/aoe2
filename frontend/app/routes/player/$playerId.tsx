@@ -2,14 +2,15 @@ import cn from "classnames";
 import dayjs from "dayjs";
 import { useLoaderData } from "remix";
 import type { LoaderFunction } from "remix";
-import type { Match } from "@prisma/client";
+import type { Civilization, Match } from "@prisma/client";
 import { duration } from "@boertel/duration";
 import calendar from "dayjs/plugin/calendar";
+import { useParams } from "react-router-dom";
 dayjs.extend(calendar);
 
 import { db } from "~/db.server";
 
-type LoaderData = { matches: Array<Match> };
+type LoaderData = { matches: Array<Match>; civilizations: Array<Civilization> };
 
 export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
   const { playerId } = params;
@@ -55,13 +56,15 @@ export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
       stats.civilizations[me.civilizationId].losses += 1;
     }
   });
-  const winRates = Object.values(stats.civilizations)
-    .filter(({ wins, losses }) => wins + losses >= matches.length * 0.01)
-    .sort((a, z) => z.wins - a.wins);
+  const winRates = Object.values(stats.civilizations).sort(
+    (a, z) => z.wins / (z.wins + z.losses) - a.wins / (a.wins + a.losses)
+  );
 
+  const civilizations = await db.civilization.findMany();
   const data: LoaderData = {
     matches,
     winRates,
+    civilizations,
   };
   return data;
 };
@@ -70,33 +73,51 @@ export default function Matches() {
   const data = useLoaderData<LoaderData>();
   let wins = 0;
   let losses = 0;
+
+  const civilizationsPlayed = [];
+
   data.winRates.forEach((winRate) => {
     wins += winRate.wins;
     losses += winRate.losses;
+    civilizationsPlayed.push(winRate.civilization.id);
   });
 
-  let winRates = [...data.winRates];
+  let winRates = [...data.winRates].filter(
+    ({ wins, losses }) => wins + losses >= data.matches.length * 0.01
+  );
   const winRate = parseInt((wins / (wins + losses)) * 100, 10);
   const best = winRates.splice(0, 5);
   const worse = winRates.splice(winRates.length - 5, 5);
+
   return (
     <>
       <div className="max-w-prose mx-auto w-full space-y-4 mt-10 px-4">
         <h3
-          className={cn("text-4xl", {
+          className={cn("text-4xl group flex gap-2 items-center", {
             "text-green-500": winRate >= 50,
             "text-red-600": winRate < 50,
           })}
         >
-          {winRate}%
+          <div>{winRate}%</div>
+          <div className="text-sm text-gray-500 transition-opacity text-opacity-0 group-hover:text-opacity-100">
+            {wins}/{wins + losses}
+          </div>
         </h3>
-        <div className="flex justify-between">
+        <div className="flex justify-between flex-wrap">
           <WinRates winRates={best} className="text-green-600" />
           <WinRates winRates={worse} className="text-red-600" />
         </div>
         <details>
           <summary>See other civilizations</summary>
-          <WinRates winRates={winRates} />
+          <div className="mt-2">
+            <WinRates winRates={winRates} className="text-blue-600" />
+
+            <div>Civilizations never played:</div>
+            {data.civilizations
+              .filter(({ id }) => !civilizationsPlayed.includes(id))
+              .map(({ name }) => name)
+              .join(", ")}
+          </div>
         </details>
       </div>
       <ul className="max-w-prose mx-auto w-full space-y-4 p-4">
@@ -112,22 +133,31 @@ export default function Matches() {
 
 function WinRates({ winRates, className }) {
   return (
-    <ul>
+    <ul className="flex flex-col gap-2">
       {winRates.map(({ civilization: { id, name }, wins, losses }) => (
-        <li key={id}>
-          {name}{" "}
-          <span className={className}>
+        <li className="flex gap-2 group" key={id}>
+          <div className={cn("tabular-nums w-[5ch] text-right", className)}>
             {parseInt((wins / (wins + losses)) * 100, 10)}%
-          </span>{" "}
-          out of {wins + losses} matches.
+          </div>
+          <div className="flex gap-2">
+            <img
+              width="24px"
+              height="24px"
+              src={`https://aoecompanion.com/civ-icons/${name.toLowerCase()}.png`}
+            />
+            {name}
+          </div>
+          <div className="text-gray-500 transition-opacity text-opacity-0 group-hover:text-opacity-100">
+            {wins}/{wins + losses}
+          </div>
         </li>
       ))}
     </ul>
   );
 }
 
-function Match({ players, durationReal, startedAt, map }) {
-  const playerId = "2918752";
+function Match({ players, durationReal, startedAt, map, leaderboardType }) {
+  const { playerId } = useParams();
   let me = {};
   let teams = {};
   players.forEach((player) => {
@@ -141,7 +171,9 @@ function Match({ players, durationReal, startedAt, map }) {
     <div
       className={cn(
         "flex flex-col group border border-yellow-400 border-opacity-20 hover:border-opacity-100 transition-opacity rounded-md p-4 bg-opacity-10 space-y-2 cursor-pointer",
-        { "bg-green-600": me.winner, "bg-red-600": me.winner === false }
+        durationReal > 5 * 60
+          ? { "bg-green-600": me.winner, "bg-red-600": me.winner === false }
+          : "bg-gray-100 border-gray-400"
       )}
     >
       <div className="flex justify-between">
@@ -160,9 +192,12 @@ function Match({ players, durationReal, startedAt, map }) {
               {players.map(
                 ({ player, playerId, winner, colorId, civilization }) => (
                   <li
-                    className={cn("flex items-center gap-1", {
-                      "flex-row-reverse": index === 1,
-                    })}
+                    className={cn(
+                      "flex items-center gap-2 text-ellipsis overflow-hidden",
+                      {
+                        "flex-row-reverse": index === 1,
+                      }
+                    )}
                     key={playerId}
                   >
                     <img
@@ -171,7 +206,7 @@ function Match({ players, durationReal, startedAt, map }) {
                       src={`https://aoecompanion.com/civ-icons/${civilization.name.toLowerCase()}.png`}
                     />
                     <Dot colorId={colorId} />
-                    {player.name}
+                    {player?.name}
                   </li>
                 )
               )}
@@ -180,13 +215,30 @@ function Match({ players, durationReal, startedAt, map }) {
         })}
       </div>
       <ul className="text-gray-500 text-sm font-light flex justify-between">
-        <li>{map.name}</li>
+        <li>
+          {getLeaderboardLabel(leaderboardType)} on{" "}
+          <span className="font-medium">{map?.name || "Unknown"}</span>
+        </li>
         <li>
           <span className="font-medium">{dayjs(startedAt).calendar()}</span> for{" "}
           {duration(durationReal).format(["h HH", "m MM"])}
         </li>
       </ul>
     </div>
+  );
+}
+
+function getLeaderboardLabel(leaderboardType) {
+  return (
+    {
+      0: "Unranked",
+      1: "1v1 Death Match",
+      2: "Team Death Match",
+      3: "1v1 Random Map",
+      4: "Team Random Map",
+      13: "1v1 Empire Wars",
+      14: "Team Empire Wars",
+    }[leaderboardType] || ""
   );
 }
 
@@ -204,7 +256,7 @@ const COLORS = {
 function Dot({ colorId }) {
   return (
     <div
-      className="w-2 h-2 opacity-10 group-hover:opacity-100 transition-opacity"
+      className="flex-shrink-0 w-2 h-2 rounded-full opacity-10 group-hover:opacity-100 transition-opacity"
       style={{ backgroundColor: COLORS[colorId + 1] }}
     />
   );
