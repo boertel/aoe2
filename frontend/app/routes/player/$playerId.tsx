@@ -69,12 +69,17 @@ export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
   return data;
 };
 
+const formatter = new Intl.ListFormat("en", {
+  style: "long",
+  type: "conjunction",
+});
+
 export default function Matches() {
   const data = useLoaderData<LoaderData>();
   let wins = 0;
   let losses = 0;
 
-  const civilizationsPlayed = [];
+  const civilizationsPlayed: number[] = [];
 
   data.winRates.forEach((winRate) => {
     wins += winRate.wins;
@@ -112,11 +117,14 @@ export default function Matches() {
           <div className="mt-2">
             <WinRates winRates={winRates} className="text-blue-600" />
 
-            <div>Civilizations never played:</div>
-            {data.civilizations
-              .filter(({ id }) => !civilizationsPlayed.includes(id))
-              .map(({ name }) => name)
-              .join(", ")}
+            <div className="mt-4 mb-1 ml-2">Civilizations never played:</div>
+            <div className="ml-6">
+              {formatter.format(
+                data.civilizations
+                  .filter(({ id }) => !civilizationsPlayed.includes(id))
+                  .map(({ name }) => name)
+              )}
+            </div>
           </div>
         </details>
       </div>
