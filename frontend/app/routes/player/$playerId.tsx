@@ -94,19 +94,29 @@ export default function Matches() {
   const best = winRates.splice(0, 5);
   const worse = winRates.splice(winRates.length - 5, 5);
 
+  const refresh = () => {};
+
   return (
     <>
       <div className="max-w-prose mx-auto w-full space-y-4 mt-10 px-4">
-        <h3
-          className={cn("text-4xl group flex gap-2 items-center", {
-            "text-green-500": winRate >= 50,
-            "text-red-600": winRate < 50,
-          })}
-        >
-          <div>{winRate}%</div>
-          <div className="text-sm text-gray-500 transition-opacity text-opacity-0 group-hover:text-opacity-100">
-            {wins}/{wins + losses}
+        <h3 className="flex items-center justify-between">
+          <div
+            className={cn("text-4xl group flex gap-2 items-center", {
+              "text-green-500": winRate >= 50,
+              "text-red-600": winRate < 50,
+            })}
+          >
+            <div>{winRate}%</div>
+            <div className="text-sm text-gray-500 transition-opacity text-opacity-0 group-hover:text-opacity-100">
+              {wins}/{wins + losses}
+            </div>
           </div>
+          <button
+            onClick={refresh}
+            className="flex items-center border-2 px-4 py-1 text-sm bg-amber-400 bg-opacity-0 transition-opacity hover:bg-opacity-40 text-amber-400 focus:bg-opacity-40 rounded-md border-amber-400"
+          >
+            refresh
+          </button>
         </h3>
         <div className="flex justify-between flex-wrap gap-2">
           <WinRates winRates={best} className="text-green-600" />

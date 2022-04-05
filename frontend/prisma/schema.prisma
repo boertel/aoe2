@@ -64,9 +64,17 @@ model Player {
   id               String             @id
   name             String?
   country          String?
+  syncedAt  DateTime?
   PlayersOnMatches PlayersOnMatches[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
 
+model RateLimit {
+  id       String   @id @default(cuid())
+  ipAddress String
+  count Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
