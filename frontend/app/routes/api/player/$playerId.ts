@@ -12,7 +12,7 @@ const pubsub = new PubSub({ projectId, credentials });
 export async function action({ params, request }) {
   const ipAddress =
     request.headers["x-forwarded-for"] || request.socket?.remoteAddress || null;
-  console.log(ipAddress);
+  console.log(ipAddress, request.headers);
   const where = {
     ipAddress,
   };
