@@ -1,22 +1,15 @@
 import cn from "classnames";
 import dayjs from "dayjs";
 import { useLoaderData, Link } from "remix";
-import type { MetaFunction, LoaderFunction } from "remix";
+import type { LoaderFunction } from "remix";
 import type { Civilization, Match } from "@prisma/client";
 import { duration } from "@boertel/duration";
 import calendar from "dayjs/plugin/calendar";
-import { useParams } from "react-router-dom";
 dayjs.extend(calendar);
 
 import { db } from "~/db.server";
 
 type LoaderData = { matches: Array<Match>; civilizations: Array<Civilization> };
-
-export const meta: MetaFunction = () => {
-  return {
-    title: "AoE2",
-  };
-};
 
 export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
   const { playerId } = params;
@@ -71,6 +64,7 @@ export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
     matches,
     winRates,
     civilizations,
+    playerId,
   };
   return data;
 };
@@ -114,7 +108,7 @@ export default function Matches() {
             {wins}/{wins + losses}
           </div>
         </h3>
-        <div className="flex justify-between flex-wrap">
+        <div className="flex justify-between flex-wrap gap-2">
           <WinRates winRates={best} className="text-green-600" />
           <WinRates winRates={worse} className="text-red-600" />
         </div>
@@ -137,7 +131,7 @@ export default function Matches() {
       <ul className="max-w-prose mx-auto w-full space-y-4 p-4">
         {data.matches.map((match) => (
           <li key={match.id}>
-            <Match key={match.id} {...match} />
+            <Match key={match.id} {...match} playerId={data.playerId} />
           </li>
         ))}
       </ul>
@@ -178,8 +172,8 @@ function Match({
   map,
   leaderboardType,
   ratingType,
+  playerId,
 }) {
-  const { playerId } = useParams();
   let me = {};
   let teams = {};
   players.forEach((player) => {
@@ -193,9 +187,12 @@ function Match({
     <Link
       to={`/match/${id}`}
       className={cn(
-        "flex flex-col group border border-yellow-400 border-opacity-20 hover:border-opacity-100 transition-opacity rounded-md p-4 bg-opacity-10 space-y-2 cursor-pointer",
+        "flex flex-col group border border-opacity-20 hover:border-opacity-100 transition-opacity rounded-md p-4 bg-opacity-10 space-y-2 cursor-pointer",
         durationReal > 5 * 60
-          ? { "bg-green-600": me.winner, "bg-red-600": me.winner === false }
+          ? {
+              "bg-green-600 border-green-600": me.winner,
+              "bg-red-600 border-red-600": me.winner === false,
+            }
           : "bg-gray-100 border-gray-400"
       )}
     >
