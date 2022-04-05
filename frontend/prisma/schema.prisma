@@ -30,10 +30,12 @@ model Match {
 }
 
 model PlayersOnMatches {
-  id      String   @id @default(cuid())
-  colorId Int
-  team    Int
-  winner  Boolean?
+  id           String   @id @default(cuid())
+  colorId      Int
+  team         Int
+  winner       Boolean?
+  rating       Int?
+  ratingChange Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

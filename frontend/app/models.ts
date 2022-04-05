@@ -83,6 +83,8 @@ export async function createMatch(match) {
         colorId: player.color_id,
         team: player.team,
         winner: player.winner,
+        rating: player.rating,
+        ratingChange: player.rating_change,
         civilization: { connect: { id: player.civilization.id } },
         player: { connect: { id: profile_id } },
         match: { connect: { id: `${match.match_id}` } },

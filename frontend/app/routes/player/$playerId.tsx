@@ -210,7 +210,14 @@ function Match({
               )}
             >
               {players.map(
-                ({ player, playerId, winner, colorId, civilization }) => (
+                ({
+                  player,
+                  playerId,
+                  winner,
+                  colorId,
+                  civilization,
+                  rating,
+                }) => (
                   <li
                     className={cn("flex items-center gap-2", {
                       "flex-row sm:flex-row-reverse": index === 1,
@@ -223,8 +230,15 @@ function Match({
                       src={`https://aoecompanion.com/civ-icons/${civilization.name.toLowerCase()}.png`}
                     />
                     <Dot colorId={colorId} />
-                    <div className="text-ellipsis overflow-hidden">
-                      {player?.name}
+                    <div
+                      className={cn("flex items-center gap-2 flex-wrap", {
+                        "flex-row sm:flex-row-reverse": index === 1,
+                      })}
+                    >
+                      <div className="text-ellipsis overflow-hidden">
+                        {player?.name}
+                      </div>
+                      <div className="text-xs opacity-40">{rating}</div>
                     </div>
                   </li>
                 )

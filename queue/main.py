@@ -91,7 +91,7 @@ def extract_api(match, item=None):
     item["finished"] = datetime.fromtimestamp(item["finished"])
     item["duration_real"] = item["finished"] - item["started"]
     for player in match["players"]:
-        data = pick(player, ["name", "profile_id", "country"])
+        data = pick(player, ["name", "profile_id", "country", "rating", "rating_change"])
         if item["players"].get(player["profile_id"]):
             item["players"][player["profile_id"]].update(data)
         else:
@@ -165,6 +165,7 @@ def create_delay(topic_id):
 def task():
     def decorator(func):
         func.delay = create_delay(func.__name__)
+        func.run = func
 
         @wraps(func)
         def wrapper(event={}, context=None):
@@ -236,10 +237,13 @@ def parse(match_id=None, **kwargs):
         item = extract_api(match)
         # 2. load aoe2record from google cloud
         storage = GoogleCloudStorage()
-        if storage.exists(match_id):
-            recording = storage.read(match_id)
-            # 3. parse it with mgz
-            item.update(extract_aoe2record(recording, item))
+        try:
+            if storage.exists(match_id):
+                recording = storage.read(match_id)
+                # 3. parse it with mgz
+                item.update(extract_aoe2record(recording, item))
+        except Exception:
+            print('failed to load from google storage')
         # 4. save data to backend
         print(item)
         requests.post(
@@ -280,11 +284,12 @@ def from_files(directory):
 
 
 if __name__ == "__main__":
+    # call `.run` to run function locally
     if sys.argv[1] == "match_for_player":
         match_for_player.delay(profile_id=sys.argv[2])
     elif sys.argv[1] == "download":
         download.delay(match_id=sys.argv[2])
     elif sys.argv[1] == "parse":
-        parse.delay(match_id=sys.argv[2])
+        parse.run(match_id=sys.argv[2])
     elif sys.argv[1] == "import":
         from_files(sys.argv[2])
