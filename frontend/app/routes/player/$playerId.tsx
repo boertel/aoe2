@@ -1,18 +1,43 @@
 import cn from "classnames";
 import dayjs from "dayjs";
-import { useLoaderData, Link } from "remix";
-import type { LoaderFunction } from "remix";
-import type { Civilization, Match } from "@prisma/client";
+import {
+  useLoaderData,
+  Link,
+  ActionFunction,
+  useActionData,
+} from "@remix-run/react";
+import type { LoaderFunction } from "@remix-run/react";
+import { PubSub } from "@google-cloud/pubsub";
+import type { Civilization, Match, PlayersOnMatches } from "@prisma/client";
 import { duration } from "@boertel/duration";
 import calendar from "dayjs/plugin/calendar";
+import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(calendar);
+dayjs.extend(relativeTime);
 
+import { rateLimit } from "~/rateLimit.server";
 import { db } from "~/db.server";
 
-type LoaderData = { matches: Array<Match>; civilizations: Array<Civilization> };
+interface WinRate {
+  civilization: Civilization;
+  wins: number;
+  losses: number;
+}
 
-export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
+type LoaderData = {
+  matches: Array<Match>;
+  civilizations: Array<Civilization>;
+  playerId?: string;
+  winRates: Array<WinRate>;
+};
+
+export let loader: LoaderFunction = async ({ request, params }) => {
   const { playerId } = params;
+  const player = await db.player.findUnique({
+    where: {
+      id: playerId,
+    },
+  });
   let where = {
     players: {
       some: {
@@ -39,20 +64,31 @@ export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
       map: true,
     },
   });
-  const stats = { civilizations: {} };
+  const stats: { civilizations: Record<string, WinRate> } = {
+    civilizations: {},
+  };
   matches.forEach(({ players }) => {
-    const me = players.find(({ playerId }) => playerId === params.playerId);
-    stats.civilizations[me.civilizationId] = stats.civilizations[
-      me.civilizationId
+    const currentPlayer:
+      | (PlayersOnMatches & { civilization: Civilization })
+      | undefined = players.find(
+      ({ playerId }) => playerId === params.playerId
+    );
+
+    if (!currentPlayer) {
+      return;
+    }
+
+    stats.civilizations[currentPlayer.civilizationId] = stats.civilizations[
+      currentPlayer.civilizationId
     ] || {
-      civilization: me.civilization,
+      civilization: currentPlayer.civilization,
       wins: 0,
       losses: 0,
     };
-    if (me.winner) {
-      stats.civilizations[me.civilizationId].wins += 1;
-    } else if (me.winner === false) {
-      stats.civilizations[me.civilizationId].losses += 1;
+    if (currentPlayer.winner) {
+      stats.civilizations[currentPlayer.civilizationId].wins += 1;
+    } else if (currentPlayer.winner === false) {
+      stats.civilizations[currentPlayer.civilizationId].losses += 1;
     }
   });
   const winRates = Object.values(stats.civilizations).sort(
@@ -64,9 +100,37 @@ export let loader: LoaderFunction = async ({ request, params, ...etc }) => {
     matches,
     winRates,
     civilizations,
-    playerId,
+    player,
   };
   return data;
+};
+
+const projectId = process.env.GOOGLE_PUBSUB_PROJECT_ID;
+const credentials = JSON.parse(
+  Buffer.from(process.env.GOOGLE_SA_KEY, "base64")
+);
+
+const pubsub = new PubSub({ projectId, credentials });
+
+export const action: ActionFunction = async ({ params, request }) => {
+  rateLimit(request, { count: 5, minutes: 15 });
+  const { playerId } = params;
+
+  const attributes = {
+    profile_id: params.playerId,
+  };
+  const dataBuffer = Buffer.from("");
+  const topicId = "match_for_player";
+  const messageId = await pubsub.topic(topicId).publish(dataBuffer, attributes);
+  const player = await db.player.update({
+    where: {
+      id: playerId,
+    },
+    data: {
+      syncedAt: new Date(),
+    },
+  });
+  return { player, messageId };
 };
 
 const formatter = new Intl.ListFormat("en", {
@@ -76,8 +140,9 @@ const formatter = new Intl.ListFormat("en", {
 
 export default function Matches() {
   const data = useLoaderData<LoaderData>();
-  let wins = 0;
-  let losses = 0;
+  const actionData = useActionData();
+  let wins: number = 0;
+  let losses: number = 0;
 
   const civilizationsPlayed: number[] = [];
 
@@ -90,11 +155,12 @@ export default function Matches() {
   let winRates = [...data.winRates].filter(
     ({ wins, losses }) => wins + losses >= data.matches.length * 0.01
   );
-  const winRate = parseInt((wins / (wins + losses)) * 100, 10);
+  const winRate = Math.floor((wins / (wins + losses)) * 100);
   const best = winRates.splice(0, 5);
   const worse = winRates.splice(winRates.length - 5, 5);
 
-  const refresh = () => {};
+  const syncedAt = dayjs(actionData?.syncedAt || data.player.syncedAt);
+  const diff = dayjs().diff(syncedAt, "minutes");
 
   return (
     <>
@@ -111,37 +177,46 @@ export default function Matches() {
               {wins}/{wins + losses}
             </div>
           </div>
-          <button
-            onClick={refresh}
-            className="flex items-center border-2 px-4 py-1 text-sm bg-amber-400 bg-opacity-0 transition-opacity hover:bg-opacity-40 text-amber-400 focus:bg-opacity-40 rounded-md border-amber-400"
-          >
-            refresh
-          </button>
+          <form method="POST">
+            <button
+              disabled={diff < 15}
+              title={diff < 15 ? `Allow in ${15 - diff} minutes` : null}
+              className="flex items-center border-2 px-4 py-1 text-sm bg-amber-400 bg-opacity-0 transition-opacity hover:bg-opacity-40 text-amber-400 focus:bg-opacity-40 rounded-md border-amber-400 disabled:bg-gray-400 disabled:bg-opacity-20 disabled:border-gray-400 disabled:border-opacity-60 disabled:text-gray-400 disabled:text-opacity-60 disabled:cursor-not-allowed"
+            >
+              refresh
+            </button>
+          </form>
         </h3>
-        <div className="flex justify-between flex-wrap gap-2">
+        <div className="gap-2 grid grid-cols-1 md:grid-cols-2">
           <WinRates winRates={best} className="text-green-600" />
           <WinRates winRates={worse} className="text-red-600" />
-        </div>
-        <details>
-          <summary>See other civilizations</summary>
-          <div className="mt-2">
-            <WinRates winRates={winRates} className="text-blue-600" />
+          <details className="md:col-span-2">
+            <summary className="cursor-pointer pl-4 hover:underline">
+              See other civilizations
+            </summary>
+            <div className="mt-2">
+              <WinRates winRates={winRates} className="text-blue-600" />
 
-            <div className="mt-4 mb-1 ml-2">Civilizations never played:</div>
-            <div className="ml-6">
-              {formatter.format(
-                data.civilizations
-                  .filter(({ id }) => !civilizationsPlayed.includes(id))
-                  .map(({ name }) => name)
-              )}
+              <div className="mt-4 mb-1 ml-2">Civilizations never played:</div>
+              <div className="ml-6">
+                {formatter.format(
+                  data.civilizations
+                    .filter(({ id }) => !civilizationsPlayed.includes(id))
+                    .map(({ name }) => name)
+                )}
+              </div>
             </div>
-          </div>
-        </details>
+          </details>
+        </div>
+
+        <div className="text-xs text-gray-500">
+          Last synced {syncedAt.fromNow()}
+        </div>
       </div>
       <ul className="max-w-prose mx-auto w-full space-y-4 p-4">
         {data.matches.map((match) => (
           <li key={match.id}>
-            <Match key={match.id} {...match} playerId={data.playerId} />
+            <Match key={match.id} {...match} playerId={data.player.id} />
           </li>
         ))}
       </ul>
@@ -248,7 +323,7 @@ function Match({
                       <div className="text-ellipsis overflow-hidden">
                         {player?.name}
                       </div>
-                      <div className="text-xs opacity-40">{rating}</div>
+                      <div className="text-xs opacity-60">{rating}</div>
                     </div>
                   </li>
                 )
@@ -264,7 +339,7 @@ function Match({
         </li>
         <li>
           <span className="font-medium">{dayjs(startedAt).calendar()}</span> for{" "}
-          {duration(durationReal).format(["h HH", "m MM"])}
+          {duration(durationReal * 1000).format(["h HH", "m MM"])}
         </li>
       </ul>
     </Link>

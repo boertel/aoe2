@@ -1,5 +1,5 @@
 import { createMatch, getMatch } from "~/models";
-import { json } from "remix";
+import { json } from "@remix-run/node";
 
 export async function loader({ params }) {
   const match = await getMatch(params.matchId);

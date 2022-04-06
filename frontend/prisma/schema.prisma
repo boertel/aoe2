@@ -73,7 +73,7 @@ model Player {
 
 model RateLimit {
   id       String   @id @default(cuid())
-  ipAddress String
+  ipAddress String @unique
   count Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
