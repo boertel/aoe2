@@ -91,7 +91,9 @@ def extract_api(match, item=None):
     item["finished"] = datetime.fromtimestamp(item["finished"])
     item["duration_real"] = item["finished"] - item["started"]
     for player in match["players"]:
-        data = pick(player, ["name", "profile_id", "country", "rating", "rating_change"])
+        data = pick(
+            player, ["name", "profile_id", "country", "rating", "rating_change"]
+        )
         if item["players"].get(player["profile_id"]):
             item["players"][player["profile_id"]].update(data)
         else:
@@ -187,7 +189,8 @@ def match_for_player(profile_id=None, start=0, count=20, **kwargs):
         return
     # 1. fetch last N matches for profile_id
     response = requests.get(
-        f"https://aoe2.net/api/player/matches?game=aoe2de&profile_id={profile_id}&count={count}&start={start}"
+        f"https://aoe2.net/api/player/matches?game=aoe2de&profile_id={profile_id}&count={count}&start={start}",
+        timeout=10,
     )
     if response.ok:
         # 3. trigger /download function for un-process matches
@@ -243,7 +246,7 @@ def parse(match_id=None, **kwargs):
                 # 3. parse it with mgz
                 item.update(extract_aoe2record(recording, item))
         except Exception:
-            print('failed to load from google storage')
+            print("failed to load from google storage")
         # 4. save data to backend
         print(item)
         requests.post(
