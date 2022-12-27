@@ -19,14 +19,19 @@ function deploy {
         --entry-point="$NAME"
 }
 
-upload
+ACTION="$1"
+FUNCTION="$2"
 
-if [[ -z "$1" ]]; then
-    deploy "match_for_player" &
-    deploy "download" &
-    deploy "parse" &
-else
-    deploy "$1"
+if [[ "$ACTION" == "upload" ]]; then
+    upload
+elif [[ "$ACTION" == "deploy" ]]; then
+    if [[ -z "$FUNCTION" ]]; then
+        deploy "match_for_player" &
+        deploy "download" &
+        deploy "parse" &
+    else
+        deploy "$FUNCTION"
+    fi
 fi
 
 wait

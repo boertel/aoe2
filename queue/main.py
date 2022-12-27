@@ -1,4 +1,7 @@
 from mgz.summary import Summary
+from mgz import header, fast
+
+import pprint
 from functools import wraps
 import json
 import sys
@@ -128,7 +131,7 @@ def extract_aoe2record(recording, item=None):
             "team": teams[player.get("number")],
             "name": player.get("name"),
             "winner": player.get("winner"),
-            "color_id": player.get("color_id"),
+            "color": player.get("color_id"),
             "civilization": {
                 "id": civilization_id,
             },
@@ -149,8 +152,7 @@ topic_id = "aoe2-recording"
 publisher = pubsub_v1.PublisherClient()
 
 
-API_DOMAIN = "https://aoe2.up.railway.app"
-# API_DOMAIN = 'http://localhost:3000'
+API_DOMAIN = os.environ["API_DOMAIN"]
 
 
 def create_delay(topic_id):
@@ -183,61 +185,103 @@ def task():
     return decorator
 
 
+# 1. sync aoe2.net with aoe2.up.railway
+# 2. trigger download for match with a ao2.up.railway id
+# 3. trigger parse
+
+
+def parse_strings(response):
+    strings = response.json()
+    maps = {}
+    for map_type in strings["map_type"]:
+        maps[map_type["id"]] = {
+            "id": map_type["id"],
+            "name": map_type["string"],
+        }
+    civilizations = {}
+    for civ in strings["civ"]:
+        civilizations[civ["id"]] = {
+            "id": civ["id"],
+            "name": civ["string"],
+        }
+
+    return maps, civilizations
+
+
 @task()
 def match_for_player(profile_id=None, start=0, count=20, **kwargs):
+    print(f"match_for_player player_id={profile_id}")
     if profile_id is None:
         return
     # 1. fetch last N matches for profile_id
+    strings = requests.get(f"https://aoe2.net/api/strings?game=aoe2de&language=en")
+
+    maps, civilizations = parse_strings(strings)
+
     response = requests.get(
         f"https://aoe2.net/api/player/matches?game=aoe2de&profile_id={profile_id}&count={count}&start={start}",
         timeout=10,
     )
     if response.ok:
         # 3. trigger /download function for un-process matches
-        matches = response.json()
+        matches = response.json()[0:1]
         for match in matches:
-            download.delay(match_id=str(match["match_id"]))
+            match["map"] = maps.get(match["map_type"])
+            for player in match["players"]:
+                player["civilization"] = civilizations.get(player["civ"])
+
+        bulk = requests.post(f"{API_DOMAIN}/api/matches", json=matches, timeout=10)
+        for match in bulk.json():
+            download.run(match_id=match["id"])
+
+
+def update_match_status(match_id, status):
+    return requests.patch(
+        f"{API_DOMAIN}/api/matches/{match_id}",
+        json={"status": status},
+        timeout=10,
+    )
 
 
 @task()
 def download(match_id=None, **kwargs):
     print(f"download match_id={match_id}")
+
     if match_id is None:
         return
 
-    match = requests.get(f"{API_DOMAIN}/api/match/{match_id}", timeout=10)
-    if match.status_code == 200:
+    response = update_match_status(match_id, "DownloadStarted")
+    match = response.json()
+
+    if match["status"] != "Fetched":
         # match has already been process, let's bail
-        return
+        # return
+        pass
+
     storage = GoogleCloudStorage()
     if not storage.exists(match_id):
-        # 1. fetch https://aoe2.net/api/match?match_id=match_id
-        response = requests.get(
-            f"https://aoe2.net/api/match?game=aoe2de&match_id={match_id}"
-        )
-        if response.ok:
-            match = response.json()
-            player_ids = [player["profile_id"] for player in match["players"]]
-            # 2. fetch recursively until successful: https://aoe.ms/replay/?gameId={match_id}&profileId={profile_id}
-            recording = download_recording(match_id, player_ids)
-            if recording:
-                # 4. save aoe2record on google cloud storage
-                storage.write(match_id, recording)
-            else:
-                # raise RecordingNotFoundError(f"recording not found for {match_id}")
-                pass
+        player_ids = [player["playerId"] for player in match["players"]]
+        # 1. fetch recursively until successful: https://aoe.ms/replay/?gameId={match_id}&profileId={profile_id}
+        recording = download_recording(match_id, player_ids)
+        if recording:
+            # 2. save aoe2record on google cloud storage
+            storage.write(match_id, recording)
+            update_match_status(match_id, "DownloadEnded")
+        else:
+            update_match_status(match_id, "DownloadFailed")
+
     # 5. pass along to /parse function
-    parse.delay(match_id=str(match_id))
+    # parse.run(match_id=match_id)
 
 
 @task()
 def parse(match_id=None, **kwargs):
     print(f"parse match_id={match_id}")
-    # 1. fetch https://aoe2.net/api/match?match_id=match_id
-    response = get_match(match_id=match_id)
+    # 1. fetch match
+    response = update_match_status(match_id, "ParseStarted")
     if response.ok:
-        match = response.json()
-        item = extract_api(match)
+        item = {}
+        # item = extract_api(match)
         # 2. load aoe2record from google cloud
         storage = GoogleCloudStorage()
         try:
@@ -246,14 +290,17 @@ def parse(match_id=None, **kwargs):
                 # 3. parse it with mgz
                 item.update(extract_aoe2record(recording, item))
         except Exception:
+            update_match_status(match_id, "ParseFailed")
             print("failed to load from google storage")
         # 4. save data to backend
         print(item)
-        requests.post(
-            f"{API_DOMAIN}/api/match/{match_id}",
-            data=json.dumps(item, default=json_serializer),
-            timeout=10,
-        )
+
+        # requests.post(
+        #    f"{API_DOMAIN}/api/match/{match_id}",
+        #    data=json.dumps(item, default=json_serializer),
+        #    timeout=10,
+        # )
+        update_match_status(match_id, "ParseEnded")
         return item
 
 
@@ -289,7 +336,7 @@ def from_files(directory):
 if __name__ == "__main__":
     # call `.run` to run function locally
     if sys.argv[1] == "match_for_player":
-        match_for_player.delay(profile_id=sys.argv[2])
+        match_for_player.run(profile_id=sys.argv[2])
     elif sys.argv[1] == "download":
         download.delay(match_id=sys.argv[2])
     elif sys.argv[1] == "parse":
