@@ -10,71 +10,95 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum MatchStatus {
+  Fetched
+  DownloadStarted
+  DownloadEnded
+  DownloadFailed
+  ParseStarted
+  ParseEnded
+  ParseFailed
+}
+
 model Match {
-  id              String    @id
-  startedAt       DateTime?
-  finishedAt      DateTime?
+  id              String      @id
+  status          MatchStatus @default(Fetched)
+  startedAt       DateTime?   @map("started_at")
+  finishedAt      DateTime?   @map("finished_at")
   server          String?
-  durationInGame  Int?
-  durationReal    Int?
-  ratingType      Int?
-  leaderboardType Int?
-  gameType        Int?
+  durationInGame  Int?        @map("duration_in_game")
+  durationReal    Int?        @map("duration_real")
+  ratingType      Int?        @map("rating_type")
+  leaderboardType Int?        @map("leaderboard_type")
+  gameType        Int?        @map("game_type")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  mapId   Int?
+  mapId   Int?               @map("map_id")
   map     Map?               @relation(fields: [mapId], references: [id])
   players PlayersOnMatches[]
+
+  @@map("match")
 }
 
 model PlayersOnMatches {
   id           String   @id @default(cuid())
-  colorId      Int
+  color        Int      @map("color")
   team         Int
   winner       Boolean?
   rating       Int?
-  ratingChange Int?
+  ratingChange Int?     @map("rating_change")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  civilizationId Int
+  civilizationId Int          @map("civilization_id")
   civilization   Civilization @relation(fields: [civilizationId], references: [id])
-  playerId       String
-  player         Player       @relation(fields: [playerId], references: [id])
-  matchId        String
-  match          Match        @relation(fields: [matchId], references: [id])
+  playerId       String       @map("player_id")
+  player         Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  matchId        String       @map("match_id")
+  match          Match        @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, matchId])
+  @@map("players_on_matches")
 }
 
 model Civilization {
   id               Int                @id
   name             String
   PlayersOnMatches PlayersOnMatches[]
+
+  @@map("civilization")
 }
 
 model Map {
   id    Int     @id
   name  String
   Match Match[]
+
+  @@map("map")
 }
 
 model Player {
   id               String             @id
   name             String?
   country          String?
-  syncedAt  DateTime?
+  syncedAt         DateTime?          @map("synced_at")
   PlayersOnMatches PlayersOnMatches[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("player")
 }
 
 model RateLimit {
-  id       String   @id @default(cuid())
-  ipAddress String @unique
-  count Int @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  ipAddress String   @unique @map("ip_address")
+  count     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("rate_limit")
 }

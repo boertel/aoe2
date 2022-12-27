@@ -1,6 +1,7 @@
+import { Match, MatchStatus } from "@prisma/client";
 import { db } from "~/db.server";
 
-export async function getMatch(matchId) {
+export async function getMatch(matchId: string) {
   return await db.match.findUnique({
     where: {
       id: matchId,
@@ -16,7 +17,54 @@ export async function getMatch(matchId) {
   });
 }
 
-export async function createMatch(match) {
+export async function updateMatchStatus(matchId: string, status: MatchStatus) {
+  return await db.match.update({
+    where: {
+      id: matchId,
+    },
+    data: {
+      status,
+    },
+  });
+}
+
+interface ParsedMatch {
+  match_id: string;
+  started?: string;
+  finished?: string;
+  server?: string;
+  duration_real?: number;
+  duration_in_game?: number;
+  rating_type?: number;
+  game_type?: number;
+  leaderboard_id?: number;
+  map: ParsedMap;
+  players: ParsedPlayer[];
+}
+
+interface ParsedMap {
+  id: number;
+  name: string;
+}
+
+interface ParsedPlayer {
+  profile_id: string;
+  color: number;
+  team: number;
+  winner?: boolean;
+  rating?: number;
+  rating_change?: number;
+  name?: string;
+  country?: string;
+  civilization: ParsedCivilization;
+}
+
+interface ParsedCivilization {
+  id: number;
+  name: string;
+}
+
+export async function createMatch(match: ParsedMatch) {
   let map = null;
   if (match.map.id) {
     map = await db.map.upsert({
@@ -30,10 +78,8 @@ export async function createMatch(match) {
       },
     });
   }
-  const createMatchData = {
+  const createMatchData: Match = {
     id: match.match_id,
-    startedAt: new Date(match.started),
-    finishedAt: new Date(match.finished),
     server: match.server,
     durationReal: match.duration_real,
     durationInGame: match.duration_in_game,
@@ -41,19 +87,31 @@ export async function createMatch(match) {
     gameType: match.game_type,
     leaderboardType: match.leaderboard_id,
   };
+
+  if (match.started) {
+    createMatchData.startedAt = new Date(match.started);
+  }
+  if (match.finished) {
+    createMatchData.finishedAt = new Date(match.finished);
+  }
   if (map) {
     createMatchData.map = {
       connect: { id: map.id },
     };
   }
 
-  await db.match.create({
-    data: createMatchData,
+  const output = await db.match.upsert({
+    where: {
+      id: createMatchData.id,
+    },
+    update: createMatchData,
+    create: createMatchData,
   });
 
   for (let i = 0; i < Object.keys(match.players).length; i += 1) {
     const player = Object.values(match.players)[i];
     const profile_id = `${player.profile_id}`;
+    const matchId = `${match.match_id}`;
     await db.player.upsert({
       where: {
         id: profile_id,
@@ -78,17 +136,26 @@ export async function createMatch(match) {
         create: { id: player.civilization.id, name: player.civilization.name },
       });
     }
-    await db.playersOnMatches.create({
-      data: {
-        colorId: player.color_id,
+    await db.playersOnMatches.upsert({
+      where: {
+        playerId_matchId: {
+          playerId: profile_id,
+          matchId,
+        },
+      },
+      update: {},
+      create: {
+        color: player.color,
         team: player.team,
         winner: player.winner,
         rating: player.rating,
         ratingChange: player.rating_change,
         civilization: { connect: { id: player.civilization.id } },
         player: { connect: { id: profile_id } },
-        match: { connect: { id: `${match.match_id}` } },
+        match: { connect: { id: matchId } },
       },
     });
   }
+
+  return output;
 }
